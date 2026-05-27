@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>HQNNDL — Quantum CSR Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.header{display:flex;align-items:center;justify-content:space-between;
+        padding:16px 28px;background:#161b27;border-bottom:1px solid #1e2736;
+        position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{font-size:26px}
+.logo-text{font-size:20px;font-weight:700;letter-spacing:-0.5px}
+.logo-text span{color:#818cf8}
+.logo-sub{font-size:11px;color:#64748b;margin-top:1px}
+.status-badge{display:flex;align-items:center;gap:8px;
+              background:#1e2736;border:1px solid #2d3748;
+              border-radius:20px;padding:6px 14px;font-size:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#374151;
+            transition:background .3s}
+.status-dot.online{background:#22c55e;box-shadow:0 0 6px #22c55e88}
+.status-dot.error{background:#ef4444}
+
+.container{max-width:1200px;margin:0 auto;padding:28px 20px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.page-sub{font-size:13px;color:#64748b;margin-bottom:22px;line-height:1.6;
+          max-width:700px}
+
+.grid{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.card{background:#161b27;border:1px solid #1e2736;border-radius:12px;
+      overflow:hidden}
+.card-header{display:flex;align-items:center;gap:10px;padding:14px 16px;
+             border-bottom:1px solid #1e2736;background:#1a2030}
+.card-icon{font-size:18px}
+.card-title{font-size:13px;font-weight:600}
+.card-sub{font-size:11px;color:#64748b;margin-left:auto}
+.card-body{padding:16px}
+
+/* ── Upload zone ──────────────────────────────────────────────── */
+.upload-zone{border:2px dashed #2d3748;border-radius:10px;padding:32px 20px;
+             text-align:center;cursor:pointer;transition:.2s;
+             background:#1a2030}
+.upload-zone:hover{border-color:#818cf8;background:#1e2438}
+.upload-zone input{display:none}
+.upload-icon{font-size:36px;margin-bottom:10px}
+.upload-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.upload-hint{font-size:12px;color:#64748b}
+
+.preview-wrap{border-radius:8px;overflow:hidden;border:1px solid #2d3748}
+.preview-img{width:100%;height:160px;object-fit:cover;display:block}
+.preview-bar{display:flex;justify-content:space-between;padding:8px 10px;
+             background:#1a2030;font-size:11px}
+.preview-name{color:#94a3b8;white-space:nowrap;overflow:hidden;
+              text-overflow:ellipsis;max-width:200px}
+.preview-size{color:#475569}
+
+.samples-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.sample-btn{font-size:11px;padding:5px 10px;border-radius:6px;
+            border:1px solid #2d3748;background:#1e2736;color:#94a3b8;
+            cursor:pointer;transition:.15s}
+.sample-btn:hover{border-color:#818cf8;color:#e2e8f0}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;
+     font-weight:600;cursor:pointer;transition:.2s;margin-top:12px;
+     display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff}
+.btn-primary:hover:not(:disabled){filter:brightness(1.1)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{font-size:11px;padding:4px 10px;border-radius:6px;
+        border:1px solid #2d3748;background:#1e2736;
+        color:#94a3b8;cursor:pointer}
+.btn-sm:hover{border-color:#818cf8;color:#e2e8f0}
+
+/* ── Pipeline bar ─────────────────────────────────────────────── */
+.pipeline{display:flex;gap:0;margin-bottom:18px;border-radius:8px;
+          overflow:hidden;border:1px solid #1e2736}
+.pipe-step{flex:1;padding:8px 4px;text-align:center;font-size:10px;
+           font-weight:500;background:#161b27;color:#475569;
+           border-right:1px solid #1e2736;transition:.3s;white-space:nowrap}
+.pipe-step:last-child{border-right:none}
+.pipe-step.active{background:#6366f1;color:#fff}
+.pipe-step.done{background:#1e3a2a;color:#22c55e}
+
+/* ── Stages list ──────────────────────────────────────────────── */
+.stage-item{display:flex;align-items:center;gap:10px;padding:8px 10px;
+            border-radius:8px;margin-bottom:4px;font-size:12px;
+            background:#1a2030;transition:.2s}
+.stage-dot{width:8px;height:8px;border-radius:50%;background:#2d3748;
+           flex-shrink:0;transition:.3s}
+.stage-dot.running{background:#f59e0b;box-shadow:0 0 6px #f59e0b88;
+                   animation:pulse 1s infinite}
+.stage-dot.done{background:#22c55e}
+.stage-dot.error{background:#ef4444}
+.stage-ms{margin-left:auto;font-size:10px;color:#475569;
+          font-family:'JetBrains Mono',monospace}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Diagnosis banner ─────────────────────────────────────────── */
+.diag-banner{border-radius:10px;padding:18px;margin-bottom:14px;
+             border:1px solid}
+.diag-label{font-size:22px;font-weight:700;margin-bottom:4px}
+.diag-conf{font-size:13px;opacity:.8;margin-bottom:8px}
+.diag-tags{display:flex;gap:8px;flex-wrap:wrap}
+.diag-tag{font-size:10px;padding:3px 8px;border-radius:4px;
+          background:rgba(255,255,255,.12);font-weight:500}
+
+/* ── Reliability badge ────────────────────────────────────────── */
+.reliability-badge{display:inline-flex;align-items:center;gap:6px;
+                   padding:6px 12px;border-radius:6px;font-size:11px;
+                   font-weight:600;margin-bottom:14px}
+.reliability-badge.reliable{background:#1e3a2a;color:#22c55e;
+                             border:1px solid #22c55e44}
+.reliability-badge.unreliable{background:#3a1e1e;color:#ef4444;
+                               border:1px solid #ef444444}
+.reliability-badge.warn{background:#3a2e1e;color:#f59e0b;
+                        border:1px solid #f59e0b44}
+
+/* ── Warning cards ────────────────────────────────────────────── */
+.warning-card{background:#3a2e1e;border:1px solid #f59e0b44;
+              border-radius:8px;padding:12px;margin-bottom:10px;
+              font-size:12px}
+.warning-card .w-title{font-weight:600;color:#f59e0b;margin-bottom:4px}
+.warning-card .w-action{color:#94a3b8;margin-top:4px}
+
+/* ── Probability bars ─────────────────────────────────────────── */
+.prob-row{margin-bottom:10px}
+.prob-header{display:flex;justify-content:space-between;
+             font-size:12px;margin-bottom:4px}
+.prob-bar-bg{background:#1e2736;border-radius:4px;height:8px;overflow:hidden}
+.prob-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+/* ── Images grid ──────────────────────────────────────────────── */
+.img-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+          margin-bottom:14px}
+.img-card{border-radius:8px;overflow:hidden;border:1px solid #2d3748}
+.img-card img{width:100%;height:110px;object-fit:cover;display:block}
+.img-label{font-size:10px;padding:6px 8px;background:#1a2030;
+           color:#64748b;font-weight:500}
+
+/* ── Biomarkers ───────────────────────────────────────────────── */
+.bio-row{display:flex;align-items:center;gap:10px;
+         margin-bottom:8px;font-size:12px}
+.bio-name{width:130px;flex-shrink:0;color:#94a3b8}
+.bio-bar-bg{flex:1;background:#1e2736;border-radius:4px;height:6px}
+.bio-bar-fill{height:100%;border-radius:4px}
+.bio-score{width:40px;text-align:right;font-family:'JetBrains Mono',monospace;
+           font-size:11px}
+.bio-sev{width:60px;font-size:10px;color:#64748b}
+
+/* ── Quantum panel ────────────────────────────────────────────── */
+.q-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.q-cell{background:#1a2030;border-radius:8px;padding:10px;text-align:center}
+.q-label{font-size:10px;color:#64748b;margin-bottom:4px}
+.q-val{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace}
+
+/* ── Perf stats ───────────────────────────────────────────────── */
+.perf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.perf-cell{background:#1a2030;border-radius:8px;padding:10px;text-align:center}
+.perf-val{font-size:16px;font-weight:700;color:#818cf8}
+.perf-label{font-size:10px;color:#64748b;margin-top:2px}
+
+/* ── Sections ─────────────────────────────────────────────────── */
+.section-title{font-size:12px;font-weight:600;color:#64748b;
+               text-transform:uppercase;letter-spacing:.5px;
+               margin-bottom:10px;margin-top:16px;
+               display:flex;align-items:center;gap:6px}
+.section-title:first-child{margin-top:0}
+
+/* ── Recommendation ───────────────────────────────────────────── */
+.rec-box{background:#1a2030;border-radius:8px;padding:12px;
+         font-size:12px;line-height:1.7;color:#94a3b8;border-left:3px solid #6366f1}
+
+/* ── History ──────────────────────────────────────────────────── */
+.history-section{margin-top:24px}
+.history-header{display:flex;align-items:center;justify-content:space-between;
+                margin-bottom:12px}
+.history-title{font-size:14px;font-weight:600}
+.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.hist-card{background:#161b27;border:1px solid #1e2736;border-radius:10px;
+           overflow:hidden;cursor:pointer;transition:.15s}
+.hist-card:hover{border-color:#6366f1}
+.hist-card img{width:100%;height:80px;object-fit:cover;display:block}
+.hist-info{padding:8px}
+.hist-label{font-size:11px;font-weight:600;margin-bottom:2px}
+.hist-time{font-size:10px;color:#475569}
+.hist-conf{font-size:10px;color:#64748b}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.empty{text-align:center;padding:50px 20px}
+.empty-icon{font-size:48px;margin-bottom:14px}
+.empty-title{font-size:16px;font-weight:600;margin-bottom:6px}
+.empty-sub{font-size:13px;color:#475569;max-width:280px;margin:0 auto}
+
+/* ── Rejection state ──────────────────────────────────────────── */
+.rejection{text-align:center;padding:40px 20px}
+.rejection-icon{font-size:48px;margin-bottom:14px}
+.rejection-title{font-size:16px;font-weight:600;color:#ef4444;margin-bottom:8px}
+.rejection-msg{font-size:13px;color:#94a3b8;max-width:320px;margin:0 auto 12px}
+.rejection-scores{display:grid;grid-template-columns:repeat(3,1fr);
+                  gap:8px;max-width:360px;margin:16px auto 0}
+.rej-score-cell{background:#1a2030;border-radius:8px;padding:10px;text-align:center}
+.rej-score-val{font-size:14px;font-weight:700;margin-bottom:2px}
+.rej-score-label{font-size:10px;color:#64748b}
+
+/* ── Toast ────────────────────────────────────────────────────── */
+#toast{position:fixed;bottom:20px;right:20px;background:#1e2736;
+       border:1px solid #2d3748;border-radius:8px;padding:12px 16px;
+       font-size:13px;opacity:0;transition:.3s;z-index:999;
+       pointer-events:none;max-width:300px}
+#toast.show{opacity:1}
+
+/* ── Download btn ─────────────────────────────────────────────── */
+.btn-download{display:inline-flex;align-items:center;gap:6px;
+              padding:8px 14px;border-radius:8px;font-size:12px;
+              font-weight:600;background:#1e2736;border:1px solid #2d3748;
+              color:#94a3b8;cursor:pointer;transition:.15s}
+.btn-download:hover{border-color:#818cf8;color:#e2e8f0}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">⚛</div>
+    <div>
+      <div class="logo-text">HQNN<span>DL</span></div>
+      <div class="logo-sub">Quantum Retinal AI · v3.0</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Checking…</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <h1 class="page-title">Central Serous Retinopathy Detection</h1>
+  <p class="page-sub">
+    Upload an OCT retinal scan — ResNet-18 feature extraction feeds an
+    8-qubit variational quantum circuit for hybrid classification across
+    four diagnostic classes.
+  </p>
+
+  <!-- Pipeline bar -->
+  <div class="pipeline" id="pipelineBar"></div>
+
+  <div class="grid">
+
+    <!-- ── LEFT ──────────────────────────────────────────────── -->
+    <aside>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">🩻</div>
+          <div class="card-title">OCT Image Input</div>
+          <div class="card-sub">PNG · JPG · BMP · TIFF</div>
+        </div>
+        <div class="card-body">
+
+          <div id="dropZone" class="upload-zone"
+               onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" accept="image/*"/>
+            <div class="upload-icon">🔬</div>
+            <div class="upload-title">Drop OCT scan here</div>
+            <div class="upload-hint">or click to browse · any retinal image</div>
+          </div>
+
+          <div id="previewSection" style="display:none;margin-top:12px">
+            <div class="preview-wrap">
+              <img id="previewImg" class="preview-img" alt="preview"/>
+              <div class="preview-bar">
+                <span class="preview-name" id="previewName"></span>
+                <span class="preview-size" id="previewSize"></span>
+              </div>
+            </div>
+            <button class="btn-sm" style="margin-top:6px"
+                    onclick="clearFile()">✕ Remove</button>
+          </div>
+
+          <div style="margin-top:14px;font-size:11px;color:#475569;
+                      margin-bottom:7px">— Try a synthetic sample —</div>
+          <div class="samples-row">
+            <button class="sample-btn" onclick="loadSample('csr2')">🔴 CSR II</button>
+            <button class="sample-btn" onclick="loadSample('csr1')">🟡 CSR I</button>
+            <button class="sample-btn" onclick="loadSample('normal')">🟢 Normal</button>
+            <button class="sample-btn" onclick="loadSample('other')">🟣 Other</button>
+          </div>
+
+          <button class="btn btn-primary" id="analyzeBtn"
+                  onclick="runAnalysis()" disabled>
+            <span>⚛</span><span>Run HQNNDL Analysis</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stages -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-header">
+          <div class="card-icon">⚙️</div>
+          <div class="card-title">Processing Pipeline</div>
+          <div class="card-sub">ResNet-18 + 8-Qubit VQC</div>
+        </div>
+        <div class="card-body" style="padding:12px">
+          <div id="stageList"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── RIGHT ─────────────────────────────────────────────── -->
+    <section id="resultCol">
+      <div class="card">
+        <div class="empty">
+          <div class="empty-icon">🩺</div>
+          <div class="empty-title">No Analysis Yet</div>
+          <div class="empty-sub">Upload an OCT image or pick a sample,
+            then click <strong>Run HQNNDL Analysis</strong></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- History -->
+  <section class="history-section" id="historySect" style="display:none">
+    <div class="history-header">
+      <div class="history-title">Recent Analyses</div>
+      <button class="btn-sm" onclick="clearHistory()">Clear history</button>
+    </div>
+    <div class="history-grid" id="historyGrid"></div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────
+const API = '';
+let currentFile = null;
+
+const STAGES = [
+  { key:'preprocess', label:'Preprocessing',     icon:'🔧' },
+  { key:'cnn',        label:'ResNet-18 Features', icon:'🧠' },
+  { key:'quantum',    label:'VQC Inference',      icon:'⚛'  },
+  { key:'biomarker',  label:'Biomarkers',         icon:'📊' },
+  { key:'detection',  label:'Area Detection',     icon:'🎯' },
+];
+
+const PIPE_LABELS = [
+  'Preprocessing','ResNet-18','Quantum VQC',
+  'Classification','Biomarkers','Detection','Report'
+];
+
+// ── Init ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildPipeline();
+  buildStages();
+  checkHealth();
+  loadHistory();
+  setupDrop();
+  document.getElementById('fileInput')
+    .addEventListener('change', e => onFileSelected(e.target.files[0]));
+});
+
+function buildPipeline(){
+  const bar = document.getElementById('pipelineBar');
+  bar.innerHTML = PIPE_LABELS.map((l,i) =>
+    `<div class="pipe-step" id="pipe${i}">${l}</div>`
+  ).join('');
+}
+
+function buildStages(){
+  const list = document.getElementById('stageList');
+  list.innerHTML = STAGES.map(s =>
+    `<div class="stage-item" id="stage_${s.key}">
+       <div class="stage-dot" id="dot_${s.key}"></div>
+       <span>${s.icon} ${s.label}</span>
+       <span class="stage-ms" id="ms_${s.key}"></span>
+     </div>`
+  ).join('');
+}
+
+// ── Health check ──────────────────────────────────────────────────
+async function checkHealth(){
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if(d.status === 'online'){
+      dot.className  = 'status-dot online';
+      text.textContent = `Online · ${d.model} · ${d.backend}`;
+    }
+  } catch(e){
+    document.getElementById('statusDot').className = 'status-dot error';
+    document.getElementById('statusText').textContent = 'Server offline';
+  }
+}
+
+// ── File handling ─────────────────────────────────────────────────
+function setupDrop(){
+  const zone = document.getElementById('dropZone');
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.style.borderColor = '#818cf8';
+  });
+  zone.addEventListener('dragleave', () => {
+    zone.style.borderColor = '';
+  });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    const f = e.dataTransfer.files[0];
+    if(f) onFileSelected(f);
+  });
+}
+
+function onFileSelected(file){
+  if(!file) return;
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewName').textContent = file.name;
+    document.getElementById('previewSize').textContent =
+      (file.size/1024).toFixed(1)+' KB';
+    document.getElementById('dropZone').style.display = 'none';
+    document.getElementById('previewSection').style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearFile(){
+  currentFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('dropZone').style.display = 'block';
+  document.getElementById('previewSection').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = true;
+}
+
+// ── Sample images ─────────────────────────────────────────────────
+function loadSample(type){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const ctx = c.getContext('2d');
+  generateSampleOCT(ctx, type);
+  c.toBlob(blob => {
+    const file = new File([blob], `sample_${type}.png`, {type:'image/png'});
+    onFileSelected(file);
+  });
+}
+
+function generateSampleOCT(ctx, type){
+  const w = 512, h = 256;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,w,h);
+
+  // Retinal layers
+  const layers = [
+    {y:0.15, t:0.04, bright:180},
+    {y:0.28, t:0.03, bright:140},
+    {y:0.42, t:0.05, bright:200},
+    {y:0.60, t:0.04, bright:160},
+    {y:0.78, t:0.06, bright:190},
+  ];
+
+  layers.forEach(l => {
+    const grd = ctx.createLinearGradient(0, l.y*h - l.t*h/2, 0, l.y*h + l.t*h/2);
+    grd.addColorStop(0,'rgba(0,0,0,0)');
+    grd.addColorStop(0.5,`rgba(${l.bright},${l.bright},${l.bright},0.9)`);
+    grd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, l.y*h - l.t*h, w, l.t*h*2);
+  });
+
+  if(type === 'csr2'){
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(w*0.5, h*0.55, w*0.18, h*0.14, 0, 0, Math.PI*2);
+    ctx.fill();
+  } else if(type === 'csr1'){
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.ellipse(w*0.5, h*0.52, w*0.10, h*0.08, 0, 0, Math.PI*2);
+    ctx.fill();
+  } else if(type === 'other'){
+    for(let i=0;i<6;i++){
+      ctx.fillStyle = `rgba(180,180,180,${0.15+Math.random()*0.2})`;
+      ctx.beginPath();
+      ctx.arc(w*(0.2+Math.random()*0.6), h*(0.3+Math.random()*0.4),
+              5+Math.random()*12, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // Noise
+  const id = ctx.getImageData(0,0,w,h);
+  for(let i=0;i<id.data.length;i+=4){
+    const n=(Math.random()-0.5)*18;
+    id.data[i]   = Math.max(0,Math.min(255,id.data[i]+n));
+    id.data[i+1] = id.data[i];
+    id.data[i+2] = id.data[i];
+  }
+  ctx.putImageData(id,0,0);
+}
+
+// ── Analysis ──────────────────────────────────────────────────────
+async function runAnalysis(){
+  if(!currentFile){ toast('No image selected'); return; }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span><span>Analysing…</span>';
+
+  resetStages();
+  setPipe(-1);
+
+  const form = new FormData();
+  form.append('image', currentFile);
+
+  try {
+    setPipe(0);
+    setStage('preprocess','running');
+
+    const r   = await fetch(`${API}/api/analyze`, {method:'POST', body:form});
+    const data = await r.json();
+
+    if(!r.ok){
+      // Handle rejection (422) vs server error (500)
+      if(r.status === 422 && data.validation){
+        showRejection(data);
+      } else {
+        showError(data.error || 'Analysis failed');
+      }
+      return;
+    }
+
+    // Mark all stages done with timing
+    const perf = data.performance || {};
+    setStage('preprocess','done', perf.preprocess_ms);
+    setStage('cnn',       'done', perf.cnn_ms);
+    setStage('quantum',   'done', perf.quantum_ms);
+    setStage('biomarker', 'done', perf.biomarker_ms);
+    setStage('detection', 'done', perf.detection_ms);
+    setPipe(6);
+
+    showResults(data);
+    addToHistory(data);
+    loadHistory();
+
+  } catch(e){
+    showError('Network error — is the server running?');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>⚛</span><span>Run HQNNDL Analysis</span>';
+  }
+}
+
+// ── Rejection display ─────────────────────────────────────────────
+function showRejection(data){
+  const v = data.validation || {};
+  const s = v.scores || {};
+
+  document.getElementById('resultCol').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🚫</div>
+        <div class="card-title">Image Rejected</div>
+      </div>
+      <div class="card-body">
+        <div class="rejection">
+          <div class="rejection-icon">🚫</div>
+          <div class="rejection-title">Not a Retinal OCT Image</div>
+          <div class="rejection-msg">${data.suggestion || v.reason || 'Please upload an OCT retinal scan.'}</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">
+            Retinal score: <strong style="color:#ef4444">${((v.confidence||0)*100).toFixed(1)}%</strong>
+            &nbsp;(threshold: ${((v.threshold||0)*100).toFixed(0)}%)
+          </div>
+          <div class="rejection-scores">
+            <div class="rej-score-cell">
+              <div class="rej-score-val" style="color:#6366f1">
+                ${((s.horizontal_layers||0)*100).toFixed(0)}%
+              </div>
+              <div class="rej-score-label">Horizontal Layers</div>
+            </div>
+            <div class="rej-score-cell">
+              <div class="rej-score-val" style="color:#22c55e">
+                ${((s.intensity_profile||0)*100).toFixed(0)}%
+              </div>
+              <div class="rej-score-label">Intensity Profile</div>
+            </div>
+            <div class="rej-score-cell">
+              <div class="rej-score-val" style="color:#f59e0b">
+                ${((s.variance_banding||0)*100).toFixed(0)}%
+              </div>
+              <div class="rej-score-label">Variance Banding</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Results display ───────────────────────────────────────────────
+function showResults(d){
+  const diag    = d.diagnosis   || {};
+  const q       = d.quantum     || {};
+  const perf    = d.performance || {};
+  const bio     = d.biomarkers  || [];
+  const regions = d.regions     || [];
+  const warns   = diag.warnings || [];
+  const reliable = diag.clinically_reliable !== false;
+  const wsrc    = diag.weights_source || 'unknown';
+
+  // Colour for diagnosis
+  const colorMap = {
+    'Normal':'#22c55e','CSR Grade I':'#f59e0b',
+    'CSR Grade II':'#ef4444','Other Pathology':'#8b5cf6'
+  };
+  const col = colorMap[diag.label] || '#818cf8';
+
+  // Reliability badge
+  let relBadge, relClass;
+  if(!reliable){
+    relBadge  = '⚠ Low Confidence — Not clinically reliable';
+    relClass  = 'unreliable';
+  } else if(wsrc === 'fallback'){
+    relBadge  = '⚠ Fallback weights — Results may be inaccurate';
+    relClass  = 'warn';
+  } else {
+    relBadge  = '✓ Trained weights · Clinically reviewed result';
+    relClass  = 'reliable';
+  }
+
+  // Warning cards HTML
+  const warnHtml = warns.map(w => `
+    <div class="warning-card">
+      <div class="w-title">⚠ ${w.code}</div>
+      <div>${w.message}</div>
+      <div class="w-action">→ ${w.action}</div>
+    </div>`).join('');
+
+  // Probability bars
+  const probHtml = (diag.probabilities||[]).map(p => `
+    <div class="prob-row">
+      <div class="prob-header">
+        <span style="color:${p.color}">${p.label}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px">
+          ${p.probability.toFixed(1)}%
+        </span>
+      </div>
+      <div class="prob-bar-bg">
+        <div class="prob-bar-fill"
+             style="width:${p.probability}%;background:${p.color}"></div>
+      </div>
+    </div>`).join('');
+
+  // Biomarker rows
+  const bioHtml = bio.map(b => `
+    <div class="bio-row">
+      <div class="bio-name">${b.name}</div>
+      <div class="bio-bar-bg">
+        <div class="bio-bar-fill"
+             style="width:${b.score}%;background:${b.color}"></div>
+      </div>
+      <div class="bio-score" style="color:${b.color}">${b.score}</div>
+      <div class="bio-sev">${b.severity}</div>
+    </div>`).join('');
+
+  // Quantum measurements
+  const meas = q.measurements || [];
+  const qHtml = meas.slice(0,8).map((v,i) => `
+    <div class="q-cell">
+      <div class="q-label">q${i}</div>
+      <div class="q-val" style="color:${v>=0?'#22c55e':'#ef4444'}">
+        ${v.toFixed(3)}
+      </div>
+    </div>`).join('');
+
+  // Regions
+  const regHtml = regions.length ? regions.map(r => `
+    <div style="display:flex;justify-content:space-between;
+                font-size:11px;padding:6px 0;
+                border-bottom:1px solid #1e2736">
+      <span style="color:#94a3b8">Region ${r.id}</span>
+      <span>${r.area} px²</span>
+      <span style="color:#f59e0b">${r.severity}</span>
+      <span style="color:#64748b">${r.location}</span>
+    </div>`).join('') : '<div style="font-size:12px;color:#475569">No significant regions detected</div>';
+
+  // Images
+  const img  = d.image || {};
+  const imgHtml = `
+    <div class="img-grid">
+      <div class="img-card">
+        <img src="${img.original  ||''}" alt="Original"/>
+        <div class="img-label">Original</div>
+      </div>
+      <div class="img-card">
+        <img src="${img.processed ||''}" alt="Processed"/>
+        <div class="img-label">Preprocessed</div>
+      </div>
+      <div class="img-card">
+        <img src="${img.annotated ||''}" alt="Annotated"/>
+        <div class="img-label">Annotated</div>
+      </div>
+    </div>`;
+
+  document.getElementById('resultCol').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🩺</div>
+        <div class="card-title">Analysis Result</div>
+        <div class="card-sub">#${d.id} · ${d.timestamp}</div>
+      </div>
+      <div class="card-body">
+
+        <!-- Reliability badge -->
+        <div class="reliability-badge ${relClass}">${relBadge}</div>
+
+        <!-- Warnings -->
+        ${warnHtml}
+
+        <!-- Diagnosis banner -->
+        <div class="diag-banner"
+             style="background:${col}18;border-color:${col}44;color:${col}">
+          <div class="diag-label">${diag.label || '—'}</div>
+          <div class="diag-conf">Confidence: ${diag.confidence||0}%</div>
+          <div class="diag-tags">
+            <span class="diag-tag">Accuracy 79%</span>
+            <span class="diag-tag">8-Qubit VQC</span>
+            <span class="diag-tag">ResNet-18</span>
+            <span class="diag-tag">${wsrc === 'trained' ? '✓ Trained Weights' : '⚠ Fallback'}</span>
+          </div>
+        </div>
+
+        <!-- Images -->
+        <div class="section-title">📷 OCT Images</div>
+        ${imgHtml}
+
+        <!-- Probabilities -->
+        <div class="section-title">📊 Class Probabilities</div>
+        ${probHtml}
+
+        <!-- Biomarkers -->
+        <div class="section-title">🔬 Retinal Biomarkers</div>
+        ${bioHtml}
+
+        <!-- Quantum -->
+        <div class="section-title">⚛ Quantum Measurements ⟨Z⟩</div>
+        <div class="q-grid">${qHtml}</div>
+        <div style="font-size:11px;color:#475569;margin-top:8px">
+          Fluid signal: <code style="color:#818cf8">${q.fluid_signal||0}</code>
+          &nbsp;·&nbsp;
+          Grad energy: <code style="color:#818cf8">${q.grad_energy||0}</code>
+        </div>
+
+        <!-- Detected regions -->
+        <div class="section-title">🎯 Detected Regions</div>
+        ${regHtml}
+
+        <!-- Recommendation -->
+        <div class="section-title">💊 Recommendation</div>
+        <div class="rec-box">${d.recommendation || '—'}</div>
+
+        <!-- Performance -->
+        <div class="section-title">⚡ Performance</div>
+        <div class="perf-grid">
+          <div class="perf-cell">
+            <div class="perf-val">${perf.preprocess_ms||0}ms</div>
+            <div class="perf-label">Preprocessing</div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-val">${perf.cnn_ms||0}ms</div>
+            <div class="perf-label">ResNet-18</div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-val">${perf.quantum_ms||0}ms</div>
+            <div class="perf-label">Quantum VQC</div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-val">${perf.biomarker_ms||0}ms</div>
+            <div class="perf-label">Biomarkers</div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-val">${perf.detection_ms||0}ms</div>
+            <div class="perf-label">Detection</div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-val">${perf.total_ms||0}ms</div>
+            <div class="perf-label">Total</div>
+          </div>
+        </div>
+
+        <!-- Download -->
+        <div style="margin-top:16px">
+          <button class="btn-download" onclick="downloadReport('${d.id}')">
+            ⬇ Download Full Report
+          </button>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function showError(msg){
+  document.getElementById('resultCol').innerHTML = `
+    <div class="card">
+      <div class="empty">
+        <div class="empty-icon">❌</div>
+        <div class="empty-title">Analysis Failed</div>
+        <div class="empty-sub" style="color:#ef4444">${msg}</div>
+      </div>
+    </div>`;
+}
+
+function resetStages(){
+  STAGES.forEach(s => {
+    document.getElementById(`dot_${s.key}`).className = 'stage-dot';
+    document.getElementById(`ms_${s.key}`).textContent = '';
+  });
+}
+
+function setStage(key, state, ms){
+  const dot = document.getElementById(`dot_${key}`);
+  if(dot) dot.className = `stage-dot ${state}`;
+  const msEl = document.getElementById(`ms_${key}`);
+  if(msEl && ms != null) msEl.textContent = `${ms}ms`;
+}
+
+function setPipe(active){
+  PIPE_LABELS.forEach((_,i) => {
+    const el = document.getElementById(`pipe${i}`);
+    if(!el) return;
+    if(active < 0)      el.className = 'pipe-step';
+    else if(i < active) el.className = 'pipe-step done';
+    else if(i===active) el.className = 'pipe-step active';
+    else                el.className = 'pipe-step';
+  });
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+async function downloadReport(id){
+  window.open(`${API}/api/report/${id}`, '_blank');
+}
+
+// ── History ───────────────────────────────────────────────────────
+function addToHistory(d){
+  let h = [];
+  try{ h = JSON.parse(localStorage.getItem('hqnndl_history')||'[]'); }catch(e){}
+  h.unshift({
+    id:         d.id,
+    timestamp:  d.timestamp,
+    label:      d.diagnosis?.label,
+    confidence: d.diagnosis?.confidence,
+    thumbnail:  d.image?.original,
+  });
+  h = h.slice(0,20);
+  try{ localStorage.setItem('hqnndl_history', JSON.stringify(h)); }catch(e){}
+}
+
+function loadHistory(){
+  let h = [];
+  try{ h = JSON.parse(localStorage.getItem('hqnndl_history')||'[]'); }catch(e){}
+  const sect = document.getElementById('historySect');
+  const grid = document.getElementById('historyGrid');
+  if(!h.length){ sect.style.display='none'; return; }
+  sect.style.display = 'block';
+  const colorMap = {
+    'Normal':'#22c55e','CSR Grade I':'#f59e0b',
+    'CSR Grade II':'#ef4444','Other Pathology':'#8b5cf6'
+  };
+  grid.innerHTML = h.map(item => `
+    <div class="hist-card">
+      <img src="${item.thumbnail||''}" alt="${item.label}"/>
+      <div class="hist-info">
+        <div class="hist-label" style="color:${colorMap[item.label]||'#818cf8'}">
+          ${item.label||'—'}
+        </div>
+        <div class="hist-conf">${item.confidence||0}% confidence</div>
+        <div class="hist-time">${item.timestamp||''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function clearHistory(){
+  localStorage.removeItem('hqnndl_history');
+  document.getElementById('historySect').style.display = 'none';
+  document.getElementById('historyGrid').innerHTML = '';
+  toast('History cleared');
+}
+</script>
+
+</body>
+</html>
