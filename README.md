@@ -167,7 +167,7 @@ Set `USE_QISKIT = True` in `backend/quantum_model.py`.
 ```bibtex
 @article{hqnndl2025,
   title   = {HQNNDL: Hybrid Quantum Neural Network for CSR Detection from OCT},
-  author  = {Your Name},
+  author  = {Annamnedi Govardhan},
   journal = {IEEE Transactions on Medical Imaging},
   year    = {2025},
   note    = {Under review}
